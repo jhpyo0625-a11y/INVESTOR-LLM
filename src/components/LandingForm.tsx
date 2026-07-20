@@ -11,6 +11,8 @@ MIN_DATE.setDate(MIN_DATE.getDate() - 30);
 const toISODate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+const SEARCH_DEBOUNCE_MS = 200;
+
 const COMPANY_OPTIONS = [
   { option: "A" as const, label: "기업 분석 리포트" },
   { option: "B" as const, label: "증권사/애널리스트 시각" },
@@ -39,17 +41,22 @@ export function LandingForm() {
     }
     const controller = new AbortController();
     setSearchError(false);
-    fetch(`/api/listings?q=${encodeURIComponent(query)}`, { signal: controller.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: Listing[]) => setSuggestions(data))
-      .catch((e) => {
-        if (e instanceof Error && e.name === "AbortError") return;
-        setSearchError(true);
-      });
-    return () => controller.abort();
+    const timer = setTimeout(() => {
+      fetch(`/api/listings?q=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((data: Listing[]) => setSuggestions(data))
+        .catch((e) => {
+          if (e instanceof Error && e.name === "AbortError") return;
+          setSearchError(true);
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [mode, query, selected]);
 
   const target = mode === "company" ? selected?.ticker : date;

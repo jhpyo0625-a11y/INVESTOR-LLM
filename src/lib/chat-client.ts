@@ -15,7 +15,7 @@ export async function streamChat(
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
       onEvent({ event: "error", data: { message: body.error ?? `HTTP ${res.status}`, retryable: false } });
       return;
     }

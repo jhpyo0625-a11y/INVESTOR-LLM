@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { StepPayload } from "@/lib/chat-types";
+import { MAX_STEP_TEXT_DISPLAY_CHARS, type StepPayload } from "@/lib/chat-types";
 
 const ICON: Record<StepPayload["type"], string> = { action: "🔧", observation: "👁" };
 
@@ -36,7 +36,7 @@ export function ReactTimeline({ steps, collapsed }: { steps: StepPayload[]; coll
               <span>{ICON[s.type]}</span>
               <span className="flex flex-col">
                 <span className="font-medium">{s.tool}</span>
-                <span className="break-all text-zinc-500">{s.text.slice(0, 300)}</span>
+                <span className="break-all text-zinc-500">{s.text.slice(0, MAX_STEP_TEXT_DISPLAY_CHARS)}</span>
               </span>
             </li>
           ))}

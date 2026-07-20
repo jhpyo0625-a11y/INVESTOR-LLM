@@ -41,6 +41,9 @@ export function ChatThread({ threadId, initial }: { threadId: string; initial: I
       },
       controller.signal,
     ).catch((e) => {
+      // Defensive backstop: streamChat catches its own failures and always
+      // resolves via onEvent, so this should be unreachable today — kept in
+      // case that contract ever regresses.
       if (id !== runId.current) return;
       setStatus("error");
       setErrorMessage(e instanceof Error ? e.message : "스트리밍 중 오류가 발생했습니다.");

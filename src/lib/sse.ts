@@ -1,6 +1,6 @@
 // src/lib/sse.ts
 import type { AgentEvent } from "@/agent/engine";
-import type { ChatEvent } from "./chat-types";
+import { MAX_STEP_TEXT_WIRE_CHARS, type ChatEvent } from "./chat-types";
 
 function toChatEvent(e: AgentEvent, threadId: string, specialistKey: string): ChatEvent {
   switch (e.type) {
@@ -14,7 +14,9 @@ function toChatEvent(e: AgentEvent, threadId: string, specialistKey: string): Ch
         data: {
           type: "observation",
           tool: e.tool,
-          text: e.result.ok ? JSON.stringify(e.result.data).slice(0, 500) : `오류: ${e.result.error}`,
+          text: e.result.ok
+            ? JSON.stringify(e.result.data).slice(0, MAX_STEP_TEXT_WIRE_CHARS)
+            : `오류: ${e.result.error}`,
         },
       };
     case "done":

@@ -15,6 +15,12 @@ export const chatRequestSchema = z
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 
+// Two-stage truncation for step text: the wire cap bounds SSE payload size
+// against huge tool results (e.g. a 32-filing DART response); the display
+// cap is a smaller, independent limit for compact timeline rendering.
+export const MAX_STEP_TEXT_WIRE_CHARS = 500;
+export const MAX_STEP_TEXT_DISPLAY_CHARS = 300;
+
 export type StepPayload = {
   type: "action" | "observation";
   tool: string;
