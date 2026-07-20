@@ -44,7 +44,16 @@ export const searchDisclosures: Tool = {
     });
     if (corpCode) params.set("corp_code", corpCode);
 
-    const raw = await fetchJson(`https://opendart.fss.or.kr/api/list.json?${params}`);
+    const key = process.env.DART_API_KEY ?? "";
+    let raw: unknown;
+    try {
+      raw = await fetchJson(`https://opendart.fss.or.kr/api/list.json?${params}`);
+    } catch (e) {
+      // fetchJson embeds the full request URL (including crtfc_key) in its
+      // error message; redact before it reaches the LLM context or the UI.
+      const message = e instanceof Error ? e.message : String(e);
+      throw new Error(key ? message.replaceAll(key, "***") : message);
+    }
     const parsed = dartResponse.parse(raw);
 
     if (parsed.status === "013")

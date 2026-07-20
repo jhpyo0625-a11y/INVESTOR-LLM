@@ -55,4 +55,18 @@ describe("search_disclosures", () => {
     const r = await searchDisclosures.run({ dateFrom: "20260717", dateTo: "20260717" });
     expect(r.ok).toBe(false);
   });
+
+  it("redacts DART_API_KEY from fetch failure messages", async () => {
+    const originalKey = process.env.DART_API_KEY;
+    process.env.DART_API_KEY = "secret-dart-key-123";
+    mocked.mockRejectedValue(
+      new Error(
+        "HTTP 401: https://opendart.fss.or.kr/api/list.json?crtfc_key=secret-dart-key-123&bgn_de=20260717",
+      ),
+    );
+    await expect(
+      searchDisclosures.run({ dateFrom: "20260717", dateTo: "20260717" }),
+    ).rejects.toThrow(/^(?!.*secret-dart-key-123).*\*\*\*.*$/);
+    process.env.DART_API_KEY = originalKey;
+  });
 });
