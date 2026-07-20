@@ -8,7 +8,8 @@ import type { Listing } from "@/lib/listings";
 const TODAY = new Date();
 const MIN_DATE = new Date(TODAY);
 MIN_DATE.setDate(MIN_DATE.getDate() - 30);
-const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+const toISODate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const COMPANY_OPTIONS = [
   { option: "A" as const, label: "기업 분석 리포트" },
