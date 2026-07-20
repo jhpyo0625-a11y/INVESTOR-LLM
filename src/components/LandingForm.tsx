@@ -29,17 +29,26 @@ export function LandingForm() {
   const [suggestions, setSuggestions] = useState<Listing[]>([]);
   const [selected, setSelected] = useState<Listing | null>(null);
   const [date, setDate] = useState("");
+  const [searchError, setSearchError] = useState(false);
 
   useEffect(() => {
     if (mode !== "company" || !query.trim() || selected) {
       setSuggestions([]);
+      setSearchError(false);
       return;
     }
     const controller = new AbortController();
+    setSearchError(false);
     fetch(`/api/listings?q=${encodeURIComponent(query)}`, { signal: controller.signal })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: Listing[]) => setSuggestions(data))
-      .catch(() => {});
+      .catch((e) => {
+        if (e instanceof Error && e.name === "AbortError") return;
+        setSearchError(true);
+      });
     return () => controller.abort();
   }, [mode, query, selected]);
 
@@ -91,6 +100,9 @@ export function LandingForm() {
             placeholder="기업명 또는 종목코드 검색"
             className="w-full rounded-lg border px-4 py-3 text-sm"
           />
+          {searchError && (
+            <p className="mt-1 text-xs text-red-600">검색을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</p>
+          )}
           {suggestions.length > 0 && (
             <ul className="absolute z-10 mt-1 w-full rounded-lg border bg-white shadow-lg dark:bg-black">
               {suggestions.map((c) => (

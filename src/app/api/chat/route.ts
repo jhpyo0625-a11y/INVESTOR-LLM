@@ -4,7 +4,36 @@ import { agentEventsToSSEStream } from "@/lib/sse";
 import { route, buildInitialMessage } from "@/agent/orchestrator";
 import { runAgent, type ChatMessage } from "@/agent/engine";
 
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+
+// ponytail: in-memory, per-instance only — resets on redeploy/restart and
+// doesn't share state across serverless instances. Fine for this plan's
+// local-only demo posture (spec §10); swap for a shared store (e.g. Upstash
+// Redis) before a multi-instance/public deploy.
+const requestLog = new Map<string, number[]>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const recent = (requestLog.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
+    requestLog.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  requestLog.set(key, recent);
+  return false;
+}
+
 export async function POST(request: Request): Promise<Response> {
+  const clientKey = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (isRateLimited(clientKey)) {
+    return Response.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429 },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = chatRequestSchema.safeParse(body);
   if (!parsed.success) {
