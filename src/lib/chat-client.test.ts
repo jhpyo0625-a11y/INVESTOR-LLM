@@ -45,4 +45,13 @@ describe("streamChat", () => {
 
     expect(events).toEqual([{ event: "error", data: { message: "no specialist", retryable: false } }]);
   });
+
+  it("emits a synthetic error event with retryable:true when fetch rejects (network error)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")));
+
+    const events: unknown[] = [];
+    await streamChat({ mode: "date", target: "2026-07-17", option: "A", threadId: "t1" }, (e) => events.push(e));
+
+    expect(events).toEqual([{ event: "error", data: { message: "network error", retryable: true } }]);
+  });
 });
