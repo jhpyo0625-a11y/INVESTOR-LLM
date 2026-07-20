@@ -5,7 +5,9 @@ import { fetchJson } from "./http";
 import { searchDisclosures } from "./disclosures";
 
 const mocked = vi.mocked(fetchJson);
-beforeEach(() => mocked.mockReset());
+beforeEach(() => {
+  mocked.mockReset();
+});
 
 describe("search_disclosures", () => {
   it("maps DART response to filings", async () => {
