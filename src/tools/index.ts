@@ -17,3 +17,11 @@ export async function runTool(name: string, args: unknown): Promise<ToolResult> 
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+import { searchDisclosures } from "./disclosures";
+import { getStockData } from "./stock";
+import { getMarketOverview } from "./market";
+import { webSearch } from "./search";
+
+registerTools([searchDisclosures, getStockData, getMarketOverview, webSearch]);
+export { searchDisclosures, getStockData, getMarketOverview, webSearch };
