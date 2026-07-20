@@ -21,6 +21,10 @@ function toChatEvent(e: AgentEvent, threadId: string, specialistKey: string): Ch
       return { event: "done", data: { threadId, specialistKey } };
     case "error":
       return { event: "error", data: { message: e.message, retryable: e.retryable } };
+    default: {
+      const exhaustive: never = e;
+      throw new Error(`unhandled AgentEvent type: ${JSON.stringify(exhaustive)}`);
+    }
   }
 }
 
