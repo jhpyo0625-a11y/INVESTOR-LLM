@@ -78,4 +78,20 @@ describe("runAgent", () => {
     const events = await collect(runAgent(config as any, [{ role: "user", content: "x" }], { client: client as any, runTool: vi.fn() }));
     expect(events).toEqual([{ type: "error", message: "502", retryable: true }]);
   });
+
+  it("emits non-retryable error when the stream breaks mid-iteration", async () => {
+    const brokenStream = (async function* () {
+      yield { choices: [{ delta: text("일부 답변") }] };
+      throw new Error("connection reset");
+    })();
+    const client = { chat: { completions: { create: vi.fn(async () => brokenStream) } } };
+    const runTool = vi.fn();
+
+    const events = await collect(runAgent(config as any, [{ role: "user", content: "x" }], { client: client as any, runTool }));
+
+    expect(events).toEqual([
+      { type: "token", text: "일부 답변" },
+      { type: "error", message: "connection reset", retryable: false },
+    ]);
+  });
 });

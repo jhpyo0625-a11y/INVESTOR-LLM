@@ -51,19 +51,25 @@ export async function* runAgent(
 
     let content = "";
     const calls: { id: string; name: string; args: string }[] = [];
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (!delta) continue;
-      if (delta.content) {
-        content += delta.content;
-        yield { type: "token", text: delta.content };
+    try {
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+        if (delta.content) {
+          content += delta.content;
+          yield { type: "token", text: delta.content };
+        }
+        for (const tc of delta.tool_calls ?? []) {
+          calls[tc.index] ??= { id: tc.id ?? "", name: "", args: "" };
+          if (tc.id) calls[tc.index].id = tc.id;
+          if (tc.function?.name) calls[tc.index].name += tc.function.name;
+          if (tc.function?.arguments) calls[tc.index].args += tc.function.arguments;
+        }
       }
-      for (const tc of delta.tool_calls ?? []) {
-        calls[tc.index] ??= { id: tc.id ?? "", name: "", args: "" };
-        if (tc.id) calls[tc.index].id = tc.id;
-        if (tc.function?.name) calls[tc.index].name += tc.function.name;
-        if (tc.function?.arguments) calls[tc.index].args += tc.function.arguments;
-      }
+    } catch (e) {
+      // mid-stream failure: partial state already emitted, a bare retry isn't safe/meaningful here
+      yield { type: "error", message: e instanceof Error ? e.message : String(e), retryable: false };
+      return;
     }
 
     if (calls.length === 0) {
