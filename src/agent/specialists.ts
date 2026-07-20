@@ -1,6 +1,17 @@
 import type { SpecialistConfig } from "./engine";
 import { searchDisclosures, getStockData, getMarketOverview, webSearch } from "@/tools/index";
 
+export const SPECIALIST_KEYS = [
+  "company_analysis",
+  "broker_view",
+  "macro",
+  "daily_reports",
+  "disclosures",
+  "flows",
+] as const;
+
+export type SpecialistKey = (typeof SPECIALIST_KEYS)[number];
+
 const DISCLAIMER =
   "답변 마지막에 반드시 다음 문장을 포함하라: '본 분석은 투자 참고용이며, 투자 판단의 책임은 투자자 본인에게 있습니다.'";
 
@@ -9,7 +20,7 @@ const COMMON = `너는 한국 주식시장 전문 애널리스트다. 반드시 
 확보하지 못한 데이터는 추측하지 말고 "확인 불가"라고 명시한다.
 마크다운(제목, 표, 불릿)으로 읽기 쉽게 구성한다. ${DISCLAIMER}`;
 
-export const specialists: Record<string, SpecialistConfig> = {
+export const specialists: Record<SpecialistKey, SpecialistConfig> = {
   company_analysis: {
     key: "company_analysis",
     systemPrompt: `${COMMON}
