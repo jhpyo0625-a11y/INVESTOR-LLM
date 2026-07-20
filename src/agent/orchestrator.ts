@@ -1,4 +1,4 @@
-import { specialists } from "./specialists";
+import { specialists, type SpecialistKey } from "./specialists";
 import type { SpecialistConfig } from "./engine";
 import { findByTicker } from "@/lib/listings";
 
@@ -8,7 +8,7 @@ export type AnalysisRequest = {
   option: "A" | "B" | "C" | "D";
 };
 
-const ROUTES: Record<string, string> = {
+const ROUTES: Record<string, SpecialistKey> = {
   "company:A": "company_analysis",
   "company:B": "broker_view",
   "date:A": "macro",
@@ -18,7 +18,8 @@ const ROUTES: Record<string, string> = {
 };
 
 export function route(req: AnalysisRequest): SpecialistConfig | undefined {
-  return specialists[ROUTES[`${req.mode}:${req.option}`] ?? ""];
+  const key = ROUTES[`${req.mode}:${req.option}`];
+  return key ? specialists[key] : undefined;
 }
 
 export function buildInitialMessage(req: AnalysisRequest): string {
