@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Listing } from "@/lib/listings";
+import { searchCompaniesRemote } from "@/lib/listings-client";
 
 const TODAY = new Date();
 const MIN_DATE = new Date(TODAY);
@@ -42,12 +43,8 @@ export function LandingForm() {
     const controller = new AbortController();
     setSearchError(false);
     const timer = setTimeout(() => {
-      fetch(`/api/listings?q=${encodeURIComponent(query)}`, { signal: controller.signal })
-        .then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        })
-        .then((data: Listing[]) => setSuggestions(data))
+      searchCompaniesRemote(query, controller.signal)
+        .then((data) => setSuggestions(data))
         .catch((e) => {
           if (e instanceof Error && e.name === "AbortError") return;
           setSearchError(true);

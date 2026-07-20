@@ -52,6 +52,18 @@ describe("POST /api/chat", () => {
     expect(mockedRunAgent).not.toHaveBeenCalled();
   });
 
+  it("400s on a non-JSON request body without calling the agent", async () => {
+    const res = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: "not json",
+        headers: { "x-forwarded-for": nextIp() },
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockedRunAgent).not.toHaveBeenCalled();
+  });
+
   it("400s on an unknown mode:option combination", async () => {
     const res = await POST(req({ mode: "company", target: "005930", option: "C", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
     expect(res.status).toBe(400);
