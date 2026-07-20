@@ -1,0 +1,10 @@
+[
+  {"name": "삼성전자", "ticker": "005930", "corpCode": "00126380"},
+  {"name": "삼성전자우", "ticker": "006400", "corpCode": "00126382"},
+  {"name": "삼성SDI", "ticker": "006400", "corpCode": "00128229"},
+  {"name": "SK하이닉스", "ticker": "000660", "corpCode": "00088857"},
+  {"name": "LG전자", "ticker": "066570", "corpCode": "00129262"},
+  {"name": "네이버", "ticker": "035720", "corpCode": "00124173"},
+  {"name": "카카오", "ticker": "035720", "corpCode": "00124173"},
+  {"name": "현대자동차", "ticker": "005380", "corpCode": "00130496"}
+]
