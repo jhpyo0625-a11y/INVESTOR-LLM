@@ -1,5 +1,9 @@
 import type { SpecialistConfig } from "./engine";
 import { searchDisclosures, getStockData, getMarketOverview, webSearch } from "@/tools/index";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { makeGetPortfolioTool } from "@/tools/portfolio";
+import { invokeTool } from "@/tools/index";
+import type { ToolResult } from "@/tools/types";
 
 export const SPECIALIST_KEYS = [
   "company_analysis",
@@ -8,6 +12,7 @@ export const SPECIALIST_KEYS = [
   "daily_reports",
   "disclosures",
   "flows",
+  "portfolio",
 ] as const;
 
 export type SpecialistKey = (typeof SPECIALIST_KEYS)[number];
@@ -20,7 +25,7 @@ const COMMON = `너는 한국 주식시장 전문 애널리스트다. 반드시 
 확보하지 못한 데이터는 추측하지 말고 "확인 불가"라고 명시한다.
 마크다운(제목, 표, 불릿)으로 읽기 쉽게 구성한다. ${DISCLAIMER}`;
 
-export const specialists: Record<SpecialistKey, SpecialistConfig> = {
+export const specialists: Record<Exclude<SpecialistKey, "portfolio">, SpecialistConfig> = {
   company_analysis: {
     key: "company_analysis",
     systemPrompt: `${COMMON}
@@ -70,3 +75,27 @@ export const specialists: Record<SpecialistKey, SpecialistConfig> = {
     tools: [getStockData, getMarketOverview, webSearch],
   },
 };
+
+export function buildPortfolioSpecialist(userId: string, supabase: SupabaseClient): SpecialistConfig {
+  const portfolioTool = makeGetPortfolioTool(userId, supabase);
+  return {
+    key: "portfolio",
+    systemPrompt: `${COMMON}
+임무: 로그인한 사용자의 보유 포트폴리오 분석.
+순서: (1) get_portfolio로 보유 종목, 수량, 평단가, 현재가, 평가손익 확보 (2) 보유 종목이 없으면 "보유 종목 없음"이라고 명시 (3) 필요시 web_search로 개별 종목 최근 뉴스 보강.
+리포트 구성: 포트폴리오 요약(총 평가손익) → 종목별 현황(표) → 리스크가 큰 종목 코멘트 → 전반적 포트폴리오 조언.`,
+    tools: [portfolioTool, getStockData, webSearch],
+  };
+}
+
+// PortfolioAnalyst's get_portfolio tool is built per-request (bound to a
+// specific userId), so it can't live in the static toolRegistry that the
+// other 5 specialists' tools share. This builds a runTool override, scoped
+// to a single SpecialistConfig's own tools, for runAgent's deps.runTool hook.
+export function buildPortfolioRunTool(config: SpecialistConfig): (name: string, args: unknown) => Promise<ToolResult> {
+  const byName = new Map(config.tools.map((t) => [t.name, t] as const));
+  return async (name, args) => {
+    const tool = byName.get(name);
+    return tool ? invokeTool(tool, args) : { ok: false, error: `unknown tool: ${name}` };
+  };
+}

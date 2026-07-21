@@ -3,12 +3,20 @@ import { z } from "zod";
 
 export const chatRequestSchema = z
   .object({
-    mode: z.enum(["company", "date"]),
-    target: z.string().min(1),
-    option: z.enum(["A", "B", "C", "D"]),
+    mode: z.enum(["company", "date", "portfolio"]),
+    target: z.string().min(1).optional(),
+    option: z.enum(["A", "B", "C", "D"]).optional(),
     threadId: z.string().min(1),
   })
-  .refine((v) => v.mode !== "date" || /^\d{4}-\d{2}-\d{2}$/.test(v.target), {
+  .refine((v) => v.mode === "portfolio" || v.target !== undefined, {
+    message: "target is required for mode:company/date",
+    path: ["target"],
+  })
+  .refine((v) => v.mode === "portfolio" || v.option !== undefined, {
+    message: "option is required for mode:company/date",
+    path: ["option"],
+  })
+  .refine((v) => v.mode !== "date" || (v.target !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(v.target)), {
     message: "target must be YYYY-MM-DD for mode:date",
     path: ["target"],
   });

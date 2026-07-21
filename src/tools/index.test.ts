@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { registerTools, runTool } from "./index";
+import { invokeTool, registerTools, runTool } from "./index";
 import type { Tool } from "./types";
 
 const echo: Tool = {
@@ -20,6 +20,11 @@ const boom: Tool = {
 
 describe("runTool", () => {
   registerTools([echo, boom]);
+  it("invokeTool runs a Tool object directly, same validation as runTool", async () => {
+    expect(await invokeTool(echo, { msg: "hi" })).toEqual({ ok: true, data: { msg: "hi" } });
+    expect((await invokeTool(echo, { msg: 42 })).ok).toBe(false);
+    expect(await invokeTool(boom, {})).toEqual({ ok: false, error: "kaput" });
+  });
   it("runs a tool with valid args", async () => {
     expect(await runTool("echo", { msg: "hi" })).toEqual({ ok: true, data: { msg: "hi" } });
   });
