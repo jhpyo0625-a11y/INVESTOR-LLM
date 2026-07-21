@@ -1,12 +1,39 @@
 // src/lib/chat-types.ts
 import { z } from "zod";
 
+// ponytail: mirrors SPECIALIST_KEYS in src/agent/specialists.ts — duplicated
+// (not imported) so this lib-level file has no dependency on the agent
+// layer. Keep both lists in sync if a specialist is added or removed.
+const specialistKeySchema = z.enum([
+  "company_analysis",
+  "broker_view",
+  "macro",
+  "daily_reports",
+  "disclosures",
+  "flows",
+  "portfolio",
+]);
+
+export type SpecialistKeyName = z.infer<typeof specialistKeySchema>;
+
+const followupSchema = z.object({
+  text: z.string().min(1),
+  currentSpecialistKey: specialistKeySchema,
+  turns: z.array(
+    z.object({
+      question: z.string().min(1).nullable(),
+      answer: z.string(),
+    }),
+  ),
+});
+
 export const chatRequestSchema = z
   .object({
     mode: z.enum(["company", "date", "portfolio"]),
     target: z.string().min(1).optional(),
     option: z.enum(["A", "B", "C", "D"]).optional(),
     threadId: z.string().min(1),
+    followup: followupSchema.optional(),
   })
   .refine((v) => v.mode === "portfolio" || v.target !== undefined, {
     message: "target is required for mode:company/date",
