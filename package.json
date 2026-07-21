@@ -11,6 +11,8 @@
     "build:listings": "tsx --env-file=.env.local scripts/build-listings.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.7",
     "fflate": "^0.8.3",
     "next": "16.2.10",
     "openai": "^6.48.0",
