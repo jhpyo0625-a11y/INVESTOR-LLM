@@ -14,7 +14,7 @@ function toolCallResponse(specialist: string) {
     choices: [
       {
         message: {
-          tool_calls: [{ function: { name: "classify_intent", arguments: JSON.stringify({ specialist }) } }],
+          tool_calls: [{ type: "function" as const, function: { name: "classify_intent", arguments: JSON.stringify({ specialist }) } }],
         },
       },
     ],

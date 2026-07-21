@@ -37,7 +37,7 @@ export async function classifyIntent(
     });
 
     const call = completion.choices[0]?.message.tool_calls?.[0];
-    if (!call) return input.currentSpecialistKey;
+    if (!call || call.type !== "function") return input.currentSpecialistKey;
     const parsed = schema.safeParse(JSON.parse(call.function.arguments));
     return parsed.success ? parsed.data.specialist : input.currentSpecialistKey;
   } catch {
