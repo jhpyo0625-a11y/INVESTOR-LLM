@@ -36,4 +36,19 @@ describe("orchestrator routing", () => {
   it("unknown ticker throws", () => {
     expect(() => buildInitialMessage({ mode: "company", target: "000000", option: "A" })).toThrow();
   });
+
+  it("portfolio mode with no userId routes nowhere", () => {
+    expect(route({ mode: "portfolio", target: "", option: undefined })).toBeUndefined();
+  });
+
+  it("portfolio mode with a userId and supabase client routes to the portfolio specialist", () => {
+    const fakeSupabase = {} as never;
+    const specialist = route({ mode: "portfolio", target: "", option: undefined }, { userId: "u1", supabase: fakeSupabase });
+    expect(specialist?.key).toBe("portfolio");
+  });
+
+  it("portfolio message has no ticker/date, just the instruction", () => {
+    const msg = buildInitialMessage({ mode: "portfolio", target: "", option: undefined });
+    expect(msg).toContain("포트폴리오");
+  });
 });
