@@ -42,11 +42,27 @@ describe("get_portfolio tool", () => {
     expect(result).toEqual({ ok: true, data: { holdings: [] } });
   });
 
-  it("sets currentPrice/valueKrw to null when the price lookup fails, without failing the whole tool", async () => {
+  it("sets currentPrice/valueKrw to null when the price lookup fails (resolves with ok: false), without failing the whole tool", async () => {
     mockedListHoldings.mockResolvedValue([
       { id: "h1", ticker: "005930", name: "삼성전자", quantity: 10, buyPrice: 70000, createdAt: "2026-07-20T00:00:00Z" },
     ]);
     mockedGetStockDataRun.mockResolvedValue({ ok: false, error: "upstream down" });
+
+    const tool = makeGetPortfolioTool("u1", {} as SupabaseClient);
+    const result = await tool.run({});
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const data = result.data as { holdings: Array<{ currentPrice: number | null; valueKrw: number | null }> };
+    expect(data.holdings[0].currentPrice).toBeNull();
+    expect(data.holdings[0].valueKrw).toBeNull();
+  });
+
+  it("sets currentPrice/valueKrw to null when the price lookup throws, without failing the whole tool", async () => {
+    mockedListHoldings.mockResolvedValue([
+      { id: "h1", ticker: "005930", name: "삼성전자", quantity: 10, buyPrice: 70000, createdAt: "2026-07-20T00:00:00Z" },
+    ]);
+    mockedGetStockDataRun.mockRejectedValue(new Error("network error"));
 
     const tool = makeGetPortfolioTool("u1", {} as SupabaseClient);
     const result = await tool.run({});
