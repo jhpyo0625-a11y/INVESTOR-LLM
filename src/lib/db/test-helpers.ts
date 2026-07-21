@@ -30,3 +30,17 @@ export function fakeSupabaseChain<T>(result: FakeResult<T>) {
 export function fakeSupabaseClient(chain: unknown): SupabaseClient {
   return { from: () => chain } as unknown as SupabaseClient;
 }
+
+// For functions that make multiple sequential `.from()` calls (e.g.
+// appendTurn's read-then-write), each call consumes the next chain in
+// order; the last chain repeats if more calls happen than chains given.
+export function fakeSupabaseClientSequence(chains: unknown[]): SupabaseClient {
+  let i = 0;
+  return {
+    from: () => {
+      const chain = chains[Math.min(i, chains.length - 1)];
+      i += 1;
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+}
