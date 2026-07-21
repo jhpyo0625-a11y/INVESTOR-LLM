@@ -5,13 +5,25 @@ vi.mock("@/agent/engine", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/agent/engine")>();
   return { ...actual, runAgent: vi.fn() };
 });
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase/dal", () => ({ getUser: vi.fn() }));
+vi.mock("@/lib/db/analyses", () => ({ persistAnalysis: vi.fn().mockResolvedValue(undefined) }));
 import { runAgent } from "@/agent/engine";
+import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/dal";
+import { persistAnalysis } from "@/lib/db/analyses";
 import { POST } from "./route";
 
 const mockedRunAgent = vi.mocked(runAgent);
+const mockedCreateClient = vi.mocked(createClient);
+const mockedGetUser = vi.mocked(getUser);
+const mockedPersistAnalysis = vi.mocked(persistAnalysis);
 
 beforeEach(() => {
   mockedRunAgent.mockReset();
+  mockedCreateClient.mockResolvedValue({} as never);
+  mockedGetUser.mockResolvedValue(null);
+  mockedPersistAnalysis.mockClear();
 });
 
 async function* fakeAgent() {
@@ -97,5 +109,39 @@ describe("POST /api/chat", () => {
     const res = await POST(req(body, { "x-forwarded-for": ip }));
     expect(res.status).toBe(429);
     expect(mockedRunAgent).not.toHaveBeenCalled();
+  });
+
+  it("401s on mode:portfolio for a guest, without calling the agent", async () => {
+    const res = await POST(req({ mode: "portfolio", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
+    expect(res.status).toBe(401);
+    expect(mockedRunAgent).not.toHaveBeenCalled();
+  });
+
+  it("streams SSE for mode:portfolio when logged in", async () => {
+    mockedGetUser.mockResolvedValue({ id: "u1" } as never);
+    mockedRunAgent.mockReturnValue(fakeAgent());
+    const res = await POST(req({ mode: "portfolio", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('event: done\ndata: {"threadId":"t1","specialistKey":"portfolio"}');
+  });
+
+  it("persists the analysis on done when the user is logged in", async () => {
+    mockedGetUser.mockResolvedValue({ id: "u1" } as never);
+    mockedRunAgent.mockReturnValue(fakeAgent());
+    const res = await POST(req({ mode: "company", target: "005930", option: "A", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
+    await res.text();
+    expect(mockedPersistAnalysis).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: "u1", threadId: "t1", mode: "company", answer: "안녕" }),
+    );
+  });
+
+  it("does not persist the analysis for a guest", async () => {
+    mockedGetUser.mockResolvedValue(null);
+    mockedRunAgent.mockReturnValue(fakeAgent());
+    const res = await POST(req({ mode: "company", target: "005930", option: "A", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
+    await res.text();
+    expect(mockedPersistAnalysis).not.toHaveBeenCalled();
   });
 });

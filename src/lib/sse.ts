@@ -39,6 +39,7 @@ export function agentEventsToSSEStream(
   events: AsyncGenerator<AgentEvent>,
   threadId: string,
   specialistKey: string,
+  onEvent?: (e: ChatEvent) => void,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   return new ReadableStream({
@@ -48,7 +49,9 @@ export function agentEventsToSSEStream(
         controller.close();
         return;
       }
-      controller.enqueue(encoder.encode(encodeSSE(toChatEvent(value, threadId, specialistKey))));
+      const chatEvent = toChatEvent(value, threadId, specialistKey);
+      onEvent?.(chatEvent);
+      controller.enqueue(encoder.encode(encodeSSE(chatEvent)));
     },
     async cancel() {
       await events.return?.(undefined);
