@@ -2,8 +2,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { streamChat } from "@/lib/chat-client";
 import type { ChatEvent, StepPayload } from "@/lib/chat-types";
+import { findByTicker } from "@/lib/listings";
 import { ReactTimeline } from "./ReactTimeline";
 import { StreamedAnswer } from "./StreamedAnswer";
 
@@ -17,6 +19,38 @@ export function ChatThread({ threadId, initial }: { threadId: string; initial: I
   const [errorMessage, setErrorMessage] = useState("");
   const [retryable, setRetryable] = useState(true);
   const runId = useRef(0);
+  const router = useRouter();
+  const [starred, setStarred] = useState(false);
+  const [starError, setStarError] = useState(false);
+
+  async function toggleStar() {
+    if (initial.mode !== "company" || !initial.target) return;
+    const nextStarred = !starred;
+    setStarred(nextStarred);
+    setStarError(false);
+    try {
+      const res = nextStarred
+        ? await fetch("/api/watchlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ticker: initial.target, name: findByTicker(initial.target)?.name ?? initial.target }),
+          })
+        : await fetch(`/api/watchlist?ticker=${initial.target}`, { method: "DELETE" });
+
+      if (res.status === 401) {
+        setStarred(false);
+        router.push("/?auth=required");
+        return;
+      }
+      if (!res.ok) {
+        setStarred(!nextStarred);
+        setStarError(true);
+      }
+    } catch {
+      setStarred(!nextStarred);
+      setStarError(true);
+    }
+  }
 
   function run() {
     const id = ++runId.current;
@@ -67,9 +101,15 @@ export function ChatThread({ threadId, initial }: { threadId: string; initial: I
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-6">
-      <header className="text-sm text-zinc-500">
-        {initial.mode === "company" ? `종목코드 ${initial.target}` : initial.target}
+      <header className="flex items-center justify-between text-sm text-zinc-500">
+        <span>{initial.mode === "company" ? `종목코드 ${initial.target}` : initial.target}</span>
+        {initial.mode === "company" && (
+          <button type="button" onClick={toggleStar} aria-label="watchlist" className="text-lg">
+            {starred ? "★" : "☆"}
+          </button>
+        )}
       </header>
+      {starError && <p className="text-xs text-red-600">관심종목 저장에 실패했습니다.</p>}
 
       {status === "loading" && <p className="animate-pulse text-sm text-zinc-500">분석 준비 중…</p>}
 
