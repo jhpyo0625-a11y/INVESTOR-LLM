@@ -132,3 +132,54 @@ before it, and live verification as the final step after it.
   explicitly out of scope for every prior plan, unchanged here.
 - CI/CD pipeline (GitHub Actions, preview deployments, etc.) — spec's deployment
   bonus is "Vercel, env vars set in dashboard," nothing about a CI pipeline.
+
+## 5. Known Limitation (discovered during live deployment verification)
+
+Not part of the original design — found while live-verifying the deployed app
+(Task 2, Step 4) and left here since it directly affects the parent spec's
+flagship demo flow (§13, step 1: 삼성전자 → option A).
+
+**`company_analysis` (mode:company, option A) intermittently/reliably exceeds
+Vercel Hobby's hard 60s `maxDuration` ceiling in production.** The initial
+deploy failed outright (function ran in `iad1`/US East while every tool —
+DART, Naver, Tavily — is Korea-hosted). Two fixes narrowed the gap
+substantially but didn't close it:
+
+1. `vercel.json`'s `regions: ["icn1"]` (Seoul) — moved the function itself
+   next to its tool APIs. Took the flow from a total failure (0 tokens
+   streamed) to ~100-118 tokens streamed before still hitting the wall.
+2. Capping `company_analysis`'s optional `web_search` step to exactly one
+   call (`src/agent/specialists.ts`) — removed one ReAct iteration's worth of
+   reasoning-heavy NIM latency from the worst case. Got to ~142-155 tokens
+   streamed, still not finishing in time.
+
+**Important nuance for whoever revisits this:** the `icn1` region move is a
+net win (it fixed the outright failure) but it does NOT help — and may
+slightly hurt — the specific bottleneck now remaining. `src/agent/nim.ts`
+calls `https://integrate.api.nvidia.com/v1`, NVIDIA's managed NIM endpoint,
+which is not Korea-hosted. Every ReAct iteration is a full NIM completion
+call (and streams reasoning/thinking-token content along with tool-call
+decisions, per this project's existing deliberate design — see Plan 2's
+progress ledger). Pinning the function to `icn1` optimizes the DART/Naver/
+Tavily hops but adds a trans-Pacific round trip to every NIM call instead.
+The region fix helped because tool-call latency was the dominant cost before
+it; now that it's fixed, NIM inference/reasoning time across
+`company_analysis`'s remaining 3-4 iterations is the likely dominant cost.
+
+`macro` (mode:date, option A — 2 mandatory tools, 3 iterations) completes
+reliably (55.8s observed). `company_analysis` needs 2 mandatory tools
+(`get_stock_data`, `search_disclosures`) plus a capped-optional `web_search`
+plus final-answer generation (3-4 iterations).
+
+**Explicitly not pursued further this plan (user's informed decision):**
+dropping `web_search` from `company_analysis` entirely (would match
+`macro`'s proven 2-tool pattern, at the cost of losing supplementary
+news context beyond official filings/price data).
+
+**Real remaining levers, if revisited:**
+- Upgrade to Vercel Pro (`maxDuration` up to 300s) — removes the ceiling
+  entirely, doesn't require touching the ReAct loop or prompts.
+- Check whether NVIDIA offers a Korea/Asia-region NIM endpoint or gateway —
+  would address the actual remaining bottleneck this nuance describes,
+  unlike the `icn1` function-region fix.
+- Drop `web_search` from `company_analysis` (see above).
