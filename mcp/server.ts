@@ -1,4 +1,5 @@
 // mcp/server.ts
+import { pathToFileURL } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -46,7 +47,7 @@ async function main() {
 // Guard so importing this module in vitest (which doesn't set process.argv[1]
 // to this file) never opens a real stdio connection — only `tsx mcp/server.ts`
 // as the actual entrypoint does.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((e) => {
     console.error(e);
     process.exit(1);
