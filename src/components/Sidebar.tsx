@@ -29,7 +29,7 @@ export async function Sidebar() {
 
   const pricedHoldings = await Promise.all(
     holdings.map(async (h) => {
-      const priceResult = await getStockData.run({ ticker: h.ticker });
+      const priceResult = await getStockData.run({ ticker: h.ticker }).catch(() => ({ ok: false as const, error: "price lookup failed" }));
       const currentPrice = priceResult.ok ? (priceResult.data as { price: { close: number } }).price.close : null;
       return calculateHoldingPL({ ticker: h.ticker, name: h.name, quantity: h.quantity, buyPrice: h.buyPrice, currentPrice });
     }),
