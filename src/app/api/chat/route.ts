@@ -140,9 +140,7 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 // Vercel Hobby limit (spec §10); the ReAct loop is capped at 6 iterations so it stays well under this.
+// Function region is set in vercel.json ("icn1") — route-level `preferredRegion`
+// only affects the Edge runtime, not the Node.js runtime this route uses;
+// verified empirically (X-Vercel-Id kept showing iad1 with preferredRegion alone).
 export const maxDuration = 60;
-
-// Every tool call (DART, Naver, Tavily) is Korea-hosted; running this function
-// in the default US region round-trips each one transpacific and blows the
-// 60s ceiling on the company-analysis flow. Run it in Seoul instead.
-export const preferredRegion = "icn1";
