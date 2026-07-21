@@ -1,7 +1,7 @@
 // src/lib/db/test-helpers.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type FakeResult<T> = { data: T; error: { message: string } | null };
+type FakeResult<T> = { data: T; error: { message: string; code?: string } | null };
 
 // Test double for Supabase's chainable query builder: every filter method
 // (select/eq/order/limit/insert/update/upsert/delete) returns the same
@@ -32,8 +32,9 @@ export function fakeSupabaseClient(chain: unknown): SupabaseClient {
 }
 
 // For functions that make multiple sequential `.from()` calls (e.g.
-// appendTurn's read-then-write), each call consumes the next chain in
-// order; the last chain repeats if more calls happen than chains given.
+// appendTurn's read-then-CAS-write, retried on a lost race), each call
+// consumes the next chain in order; the last chain repeats if more calls
+// happen than chains given.
 export function fakeSupabaseClientSequence(chains: unknown[]): SupabaseClient {
   let i = 0;
   return {

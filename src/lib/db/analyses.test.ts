@@ -62,10 +62,37 @@ describe("analyses data layer", () => {
     const turn2: Turn = { ...turn1, question: "외국인은 왜 팔았어?", specialistKey: "flows" };
     const client = fakeSupabaseClientSequence([
       fakeSupabaseChain({ data: row, error: null }), // getAnalysisByThreadId: existing row
-      fakeSupabaseChain({ data: null, error: null }), // update
+      fakeSupabaseChain({ data: [{ id: "a1" }], error: null }), // update matched the CAS row
     ]);
     await expect(
       appendTurn(client, { userId: "u1", threadId: "t1", mode: "company", target: "005930", option: "A", turn: turn2 }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("appendTurn retries with a fresh read when it loses the optimistic-concurrency race", async () => {
+    const turn2: Turn = { ...turn1, question: "외국인은 왜 팔았어?", specialistKey: "flows" };
+    const rowAfterRace = { ...row, turns: [turn1, turn2], updated_at: "2026-07-20T00:05:00Z" };
+    const client = fakeSupabaseClientSequence([
+      fakeSupabaseChain({ data: row, error: null }), // read: sees updated_at v1
+      fakeSupabaseChain({ data: [], error: null }), // update: 0 rows matched — someone else updated first
+      fakeSupabaseChain({ data: rowAfterRace, error: null }), // retry read: sees the winner's row
+      fakeSupabaseChain({ data: [{ id: "a1" }], error: null }), // retry update: matches this time
+    ]);
+    const turn3: Turn = { ...turn1, question: "PER은?", specialistKey: "broker_view" };
+    await expect(
+      appendTurn(client, { userId: "u1", threadId: "t1", mode: "company", target: "005930", option: "A", turn: turn3 }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("appendTurn retries as an update when insert hits a unique-violation race", async () => {
+    const client = fakeSupabaseClientSequence([
+      fakeSupabaseChain({ data: null, error: null }), // read: no row yet
+      fakeSupabaseChain({ data: null, error: { message: "duplicate key", code: "23505" } }), // insert: someone beat us to it
+      fakeSupabaseChain({ data: row, error: null }), // retry read: their row now exists
+      fakeSupabaseChain({ data: [{ id: "a1" }], error: null }), // retry update: append onto it
+    ]);
+    await expect(
+      appendTurn(client, { userId: "u1", threadId: "t1", mode: "company", target: "005930", option: "A", turn: turn1 }),
     ).resolves.toBeUndefined();
   });
 

@@ -68,29 +68,50 @@ export async function listRecentAnalyses(supabase: SupabaseClient, userId: strin
   return (data ?? []).map(toSavedAnalysis);
 }
 
+const APPEND_TURN_MAX_ATTEMPTS = 5;
+
+// ponytail: the insert-conflict retry (23505 branch below) only kicks in if
+// (user_id, thread_id) has a unique constraint in the DB. Without one, two
+// concurrent first-turns race the read and both insert — a genuine
+// duplicate row, not something app code can prevent. Add the constraint if
+// this hasn't been done already.
 export async function appendTurn(
   supabase: SupabaseClient,
   input: { userId: string; threadId: string; mode: string; target: string; option: string; turn: Turn },
 ): Promise<void> {
-  const existing = await getAnalysisByThreadId(supabase, input.userId, input.threadId);
+  for (let attempt = 0; attempt < APPEND_TURN_MAX_ATTEMPTS; attempt++) {
+    const existing = await getAnalysisByThreadId(supabase, input.userId, input.threadId);
 
-  if (!existing) {
-    const { error } = await supabase.from("analyses").insert({
-      user_id: input.userId,
-      thread_id: input.threadId,
-      mode: input.mode,
-      target: input.target,
-      option: input.option,
-      turns: [input.turn],
-    });
+    if (!existing) {
+      const { error } = await supabase.from("analyses").insert({
+        user_id: input.userId,
+        thread_id: input.threadId,
+        mode: input.mode,
+        target: input.target,
+        option: input.option,
+        turns: [input.turn],
+      });
+      if (!error) return;
+      // Another request inserted the row between our read and this insert
+      // (23505 = unique_violation on (user_id, thread_id)) — retry as an
+      // append against the row that now exists instead of failing.
+      if (error.code === "23505") continue;
+      throw new Error(`appendTurn: ${error.message}`);
+    }
+
+    // Optimistic concurrency: only apply if `updated_at` still matches what
+    // we just read. If another request appended a turn in between, this
+    // matches 0 rows instead of silently overwriting their turn — retry
+    // with a fresh read/append instead of losing it.
+    const { data, error } = await supabase
+      .from("analyses")
+      .update({ turns: [...existing.turns, input.turn], updated_at: new Date().toISOString() })
+      .eq("user_id", input.userId)
+      .eq("thread_id", input.threadId)
+      .eq("updated_at", existing.updatedAt)
+      .select("id");
     if (error) throw new Error(`appendTurn: ${error.message}`);
-    return;
+    if (data && data.length > 0) return;
   }
-
-  const { error } = await supabase
-    .from("analyses")
-    .update({ turns: [...existing.turns, input.turn], updated_at: new Date().toISOString() })
-    .eq("user_id", input.userId)
-    .eq("thread_id", input.threadId);
-  if (error) throw new Error(`appendTurn: ${error.message}`);
+  throw new Error("appendTurn: lost the update race too many times, giving up");
 }
