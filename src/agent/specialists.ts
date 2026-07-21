@@ -30,7 +30,7 @@ export const specialists: Record<Exclude<SpecialistKey, "portfolio">, Specialist
     key: "company_analysis",
     systemPrompt: `${COMMON}
 임무: 특정 기업의 종합 분석 리포트 작성.
-순서: (1) get_stock_data로 시세·수급·기본지표 확보 (2) search_disclosures로 최근 30일 공시 확인 (3) 필요시 web_search로 최근 뉴스 보강.
+순서: (1) get_stock_data로 시세·수급·기본지표 확보 (2) search_disclosures로 최근 30일 공시 확인 (3) 필요시 web_search를 최대 1회만 사용해 최근 뉴스를 보강 (추가 검색으로 refine하지 말고, 첫 검색 결과로 바로 리포트 작성).
 리포트 구성: 요약 → 주가/수급 동향 → 밸류에이션(PER/PBR 등) → 최근 공시·뉴스 핵심 → 투자 포인트와 리스크.`,
     tools: [getStockData, searchDisclosures, webSearch],
   },
