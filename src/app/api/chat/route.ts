@@ -141,3 +141,8 @@ export async function POST(request: Request): Promise<Response> {
 
 // Vercel Hobby limit (spec §10); the ReAct loop is capped at 6 iterations so it stays well under this.
 export const maxDuration = 60;
+
+// Every tool call (DART, Naver, Tavily) is Korea-hosted; running this function
+// in the default US region round-trips each one transpacific and blows the
+// 60s ceiling on the company-analysis flow. Run it in Seoul instead.
+export const preferredRegion = "icn1";
