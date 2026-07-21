@@ -8,9 +8,11 @@
     "start": "next start",
     "test": "vitest run",
     "smoke": "tsx --env-file=.env.local scripts/smoke.ts",
-    "build:listings": "tsx --env-file=.env.local scripts/build-listings.ts"
+    "build:listings": "tsx --env-file=.env.local scripts/build-listings.ts",
+    "mcp": "tsx --env-file=.env.local mcp/server.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "fflate": "^0.8.3",

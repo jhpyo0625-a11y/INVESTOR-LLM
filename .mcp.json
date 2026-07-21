@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "investor-llm": {
+      "command": "npx",
+      "args": ["tsx", "--env-file=.env.local", "mcp/server.ts"]
+    }
+  }
+}
