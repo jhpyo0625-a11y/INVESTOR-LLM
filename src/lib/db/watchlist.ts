@@ -34,3 +34,14 @@ export async function removeFromWatchlist(supabase: SupabaseClient, userId: stri
   const { error } = await supabase.from("watchlist").delete().eq("user_id", userId).eq("ticker", ticker);
   if (error) throw new Error(`removeFromWatchlist: ${error.message}`);
 }
+
+export async function isInWatchlist(supabase: SupabaseClient, userId: string, ticker: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("watchlist")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("ticker", ticker)
+    .maybeSingle();
+  if (error) throw new Error(`isInWatchlist: ${error.message}`);
+  return data !== null;
+}

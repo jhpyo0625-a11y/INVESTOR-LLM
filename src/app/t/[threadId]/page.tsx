@@ -3,6 +3,7 @@ import { ChatThread } from "@/components/ChatThread";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/dal";
 import { getAnalysisByThreadId } from "@/lib/db/analyses";
+import { isInWatchlist } from "@/lib/db/watchlist";
 
 export default async function ThreadPage({
   params,
@@ -20,6 +21,8 @@ export default async function ThreadPage({
   const supabase = await createClient();
   const user = await getUser(supabase);
   const saved = user ? await getAnalysisByThreadId(supabase, user.id, threadId) : null;
+  const initialStarred =
+    user && mode === "company" && target ? await isInWatchlist(supabase, user.id, target) : false;
 
   return (
     <main className="flex flex-1 flex-col">
@@ -27,6 +30,7 @@ export default async function ThreadPage({
         threadId={threadId}
         initial={{ mode, target: mode === "portfolio" ? undefined : target, option: mode === "portfolio" ? undefined : option }}
         initialData={saved ? { steps: saved.steps, answer: saved.answer } : undefined}
+        initialStarred={initialStarred}
       />
     </main>
   );

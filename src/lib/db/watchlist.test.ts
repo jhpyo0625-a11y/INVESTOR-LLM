@@ -1,7 +1,7 @@
 // src/lib/db/watchlist.test.ts
 import { describe, expect, it } from "vitest";
 import { fakeSupabaseChain, fakeSupabaseClient } from "./test-helpers";
-import { addToWatchlist, listWatchlist, removeFromWatchlist } from "./watchlist";
+import { addToWatchlist, isInWatchlist, listWatchlist, removeFromWatchlist } from "./watchlist";
 
 describe("watchlist data layer", () => {
   it("lists a user's watchlist", async () => {
@@ -24,5 +24,15 @@ describe("watchlist data layer", () => {
   it("removes from the watchlist without throwing on success", async () => {
     const client = fakeSupabaseClient(fakeSupabaseChain({ data: null, error: null }));
     await expect(removeFromWatchlist(client, "u1", "005930")).resolves.toBeUndefined();
+  });
+
+  it("reports true when the ticker is in the watchlist", async () => {
+    const client = fakeSupabaseClient(fakeSupabaseChain({ data: { id: "w1" }, error: null }));
+    await expect(isInWatchlist(client, "u1", "005930")).resolves.toBe(true);
+  });
+
+  it("reports false when the ticker is not in the watchlist", async () => {
+    const client = fakeSupabaseClient(fakeSupabaseChain({ data: null, error: null }));
+    await expect(isInWatchlist(client, "u1", "005930")).resolves.toBe(false);
   });
 });

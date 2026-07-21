@@ -16,10 +16,12 @@ export function ChatThread({
   threadId,
   initial,
   initialData,
+  initialStarred = false,
 }: {
   threadId: string;
   initial: Initial;
   initialData?: { steps: StepPayload[]; answer: string };
+  initialStarred?: boolean;
 }) {
   const [status, setStatus] = useState<Status>(initialData ? "done" : "loading");
   const [steps, setSteps] = useState<StepPayload[]>(initialData?.steps ?? []);
@@ -28,7 +30,7 @@ export function ChatThread({
   const [retryable, setRetryable] = useState(true);
   const runId = useRef(0);
   const router = useRouter();
-  const [starred, setStarred] = useState(false);
+  const [starred, setStarred] = useState(initialStarred);
   const [starError, setStarError] = useState(false);
 
   async function toggleStar() {

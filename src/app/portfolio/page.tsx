@@ -41,7 +41,7 @@ export default async function PortfolioPage() {
           AI 분석
         </Link>
       </div>
-      <HoldingsTable initialHoldings={rows} />
+      <HoldingsTable key={rows.map((r) => r.id).join(",")} initialHoldings={rows} />
     </main>
   );
 }
