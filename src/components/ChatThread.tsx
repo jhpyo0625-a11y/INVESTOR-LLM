@@ -10,12 +10,20 @@ import { ReactTimeline } from "./ReactTimeline";
 import { StreamedAnswer } from "./StreamedAnswer";
 
 type Status = "loading" | "streaming" | "done" | "error";
-type Initial = { mode: "company" | "date"; target: string; option: "A" | "B" | "C" | "D" };
+type Initial = { mode: "company" | "date" | "portfolio"; target?: string; option?: "A" | "B" | "C" | "D" };
 
-export function ChatThread({ threadId, initial }: { threadId: string; initial: Initial }) {
-  const [status, setStatus] = useState<Status>("loading");
-  const [steps, setSteps] = useState<StepPayload[]>([]);
-  const [answer, setAnswer] = useState("");
+export function ChatThread({
+  threadId,
+  initial,
+  initialData,
+}: {
+  threadId: string;
+  initial: Initial;
+  initialData?: { steps: StepPayload[]; answer: string };
+}) {
+  const [status, setStatus] = useState<Status>(initialData ? "done" : "loading");
+  const [steps, setSteps] = useState<StepPayload[]>(initialData?.steps ?? []);
+  const [answer, setAnswer] = useState(initialData?.answer ?? "");
   const [errorMessage, setErrorMessage] = useState("");
   const [retryable, setRetryable] = useState(true);
   const runId = useRef(0);
@@ -88,7 +96,8 @@ export function ChatThread({ threadId, initial }: { threadId: string; initial: I
   }
 
   useEffect(() => {
-    if (!initial.target) {
+    if (initialData) return; // replay mode: nothing to stream, already rendered
+    if (initial.mode !== "portfolio" && !initial.target) {
       setStatus("error");
       setErrorMessage("잘못된 요청입니다. 처음부터 다시 시도해주세요.");
       setRetryable(false);
@@ -102,7 +111,11 @@ export function ChatThread({ threadId, initial }: { threadId: string; initial: I
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-6">
       <header className="flex items-center justify-between text-sm text-zinc-500">
-        <span>{initial.mode === "company" ? `종목코드 ${initial.target}` : initial.target}</span>
+        <span>
+          {initial.mode === "company" && `종목코드 ${initial.target}`}
+          {initial.mode === "date" && initial.target}
+          {initial.mode === "portfolio" && "내 포트폴리오 분석"}
+        </span>
         {initial.mode === "company" && (
           <button type="button" onClick={toggleStar} aria-label="watchlist" className="text-lg">
             {starred ? "★" : "☆"}
