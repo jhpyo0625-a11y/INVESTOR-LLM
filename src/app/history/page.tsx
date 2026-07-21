@@ -35,7 +35,7 @@ export default async function HistoryPage() {
                 <span className="text-sm font-medium">
                   [{MODE_LABELS[a.mode] ?? a.mode}] {a.target || "포트폴리오"}
                 </span>
-                <span className="text-xs text-zinc-500">{a.createdAt.slice(0, 10)}</span>
+                <span className="text-xs text-zinc-500">{a.updatedAt.slice(0, 10)}</span>
               </Link>
             </li>
           ))}
