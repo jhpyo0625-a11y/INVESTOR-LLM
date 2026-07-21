@@ -81,7 +81,7 @@ export async function Sidebar() {
             {recent.map((a) => (
               <li key={a.id}>
                 <Link href={`/t/${a.threadId}?mode=${a.mode}&target=${a.target}&option=${a.option}`} className="text-xs underline">
-                  {a.target} ({a.createdAt.slice(0, 10)})
+                  {a.target} ({a.updatedAt.slice(0, 10)})
                 </Link>
               </li>
             ))}

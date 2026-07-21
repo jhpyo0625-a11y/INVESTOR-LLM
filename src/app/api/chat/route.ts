@@ -1,12 +1,20 @@
 // src/app/api/chat/route.ts
 import { chatRequestSchema, type StepPayload } from "@/lib/chat-types";
 import { agentEventsToSSEStream } from "@/lib/sse";
-import { route, buildInitialMessage, type AnalysisRequest } from "@/agent/orchestrator";
+import {
+  route,
+  buildInitialMessage,
+  resolveSpecialist,
+  specialistFamily,
+  type AnalysisRequest,
+} from "@/agent/orchestrator";
 import { buildPortfolioRunTool } from "@/agent/specialists";
-import { runAgent, type ChatMessage } from "@/agent/engine";
+import { runAgent, type ChatMessage, type SpecialistConfig } from "@/agent/engine";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/dal";
-import { persistAnalysis } from "@/lib/db/analyses";
+import { appendTurn } from "@/lib/db/analyses";
+import { classifyIntent } from "@/agent/intent-classifier";
+import { nimClient } from "@/agent/nim";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
@@ -53,10 +61,6 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const analysisReq: AnalysisRequest = { mode: req.mode, target: req.target ?? "", option: req.option };
-  const specialist = route(analysisReq, { userId: user?.id, supabase });
-  if (!specialist) {
-    return Response.json({ error: `no specialist for ${req.mode}:${req.option}` }, { status: 400 });
-  }
 
   let initial: string;
   try {
@@ -65,26 +69,60 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: e instanceof Error ? e.message : "invalid target" }, { status: 400 });
   }
 
-  const messages: ChatMessage[] = [{ role: "user", content: initial }];
+  let specialist: SpecialistConfig | undefined;
+  let history: ChatMessage[];
+
+  if (req.followup) {
+    const family = specialistFamily(req.mode);
+    const fallbackKey = family.includes(req.followup.currentSpecialistKey)
+      ? req.followup.currentSpecialistKey
+      : family[0];
+    const chosenKey = await classifyIntent(nimClient(), {
+      validKeys: family,
+      currentSpecialistKey: fallbackKey,
+      text: req.followup.text,
+    });
+    specialist = resolveSpecialist(chosenKey, { userId: user?.id, supabase });
+    history = [];
+    for (const t of req.followup.turns) {
+      history.push({ role: "user", content: t.question ?? initial });
+      history.push({ role: "assistant", content: t.answer });
+    }
+    history.push({ role: "user", content: req.followup.text });
+  } else {
+    specialist = route(analysisReq, { userId: user?.id, supabase });
+    history = [{ role: "user", content: initial }];
+  }
+
+  if (!specialist) {
+    return Response.json({ error: `no specialist for ${req.mode}:${req.option}` }, { status: 400 });
+  }
+  const specialistKey = specialist.key;
+
   const runTool = req.mode === "portfolio" ? buildPortfolioRunTool(specialist) : undefined;
-  const events = runAgent(specialist, messages, runTool ? { runTool } : undefined);
+  const events = runAgent(specialist, history, runTool ? { runTool } : undefined);
 
   const steps: StepPayload[] = [];
   let answer = "";
-  const stream = agentEventsToSSEStream(events, req.threadId, specialist.key, (e) => {
+  const stream = agentEventsToSSEStream(events, req.threadId, specialistKey, (e) => {
     if (e.event === "step") steps.push(e.data);
     else if (e.event === "token") answer += e.data.text;
     else if (e.event === "done" && user) {
       // Fire-and-forget: a failed save must not turn a successful analysis
       // into a visible error, and must not delay the client's `done` event.
-      persistAnalysis(supabase, {
+      appendTurn(supabase, {
         userId: user.id,
         threadId: req.threadId,
         mode: req.mode,
         target: req.target ?? "",
         option: req.option ?? "",
-        steps,
-        answer,
+        turn: {
+          question: req.followup ? req.followup.text : null,
+          answer,
+          steps,
+          specialistKey,
+          createdAt: new Date().toISOString(),
+        },
       }).catch((err) => {
         console.error("[analyses] persist failed:", err);
       });

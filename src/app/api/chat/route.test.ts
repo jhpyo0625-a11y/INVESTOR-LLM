@@ -7,23 +7,29 @@ vi.mock("@/agent/engine", async (importOriginal) => {
 });
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/dal", () => ({ getUser: vi.fn() }));
-vi.mock("@/lib/db/analyses", () => ({ persistAnalysis: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/db/analyses", () => ({ appendTurn: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/agent/nim", () => ({ nimClient: vi.fn(() => ({})), MODEL: "test-model" }));
+vi.mock("@/agent/intent-classifier", () => ({ classifyIntent: vi.fn() }));
 import { runAgent } from "@/agent/engine";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/dal";
-import { persistAnalysis } from "@/lib/db/analyses";
+import { appendTurn } from "@/lib/db/analyses";
+import { classifyIntent } from "@/agent/intent-classifier";
 import { POST } from "./route";
 
 const mockedRunAgent = vi.mocked(runAgent);
 const mockedCreateClient = vi.mocked(createClient);
 const mockedGetUser = vi.mocked(getUser);
-const mockedPersistAnalysis = vi.mocked(persistAnalysis);
+const mockedAppendTurn = vi.mocked(appendTurn);
+const mockedClassifyIntent = vi.mocked(classifyIntent);
 
 beforeEach(() => {
   mockedRunAgent.mockReset();
   mockedCreateClient.mockResolvedValue({} as never);
   mockedGetUser.mockResolvedValue(null);
-  mockedPersistAnalysis.mockClear();
+  mockedAppendTurn.mockClear();
+  mockedClassifyIntent.mockReset();
+  mockedClassifyIntent.mockResolvedValue("company_analysis");
 });
 
 async function* fakeAgent() {
@@ -131,9 +137,14 @@ describe("POST /api/chat", () => {
     mockedRunAgent.mockReturnValue(fakeAgent());
     const res = await POST(req({ mode: "company", target: "005930", option: "A", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
     await res.text();
-    expect(mockedPersistAnalysis).toHaveBeenCalledWith(
+    expect(mockedAppendTurn).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ userId: "u1", threadId: "t1", mode: "company", answer: "안녕" }),
+      expect.objectContaining({
+        userId: "u1",
+        threadId: "t1",
+        mode: "company",
+        turn: expect.objectContaining({ question: null, answer: "안녕", specialistKey: "company_analysis" }),
+      }),
     );
   });
 
@@ -142,6 +153,97 @@ describe("POST /api/chat", () => {
     mockedRunAgent.mockReturnValue(fakeAgent());
     const res = await POST(req({ mode: "company", target: "005930", option: "A", threadId: "t1" }, { "x-forwarded-for": nextIp() }));
     await res.text();
-    expect(mockedPersistAnalysis).not.toHaveBeenCalled();
+    expect(mockedAppendTurn).not.toHaveBeenCalled();
+  });
+
+  it("classifies and streams a followup on a company thread, reconstructing history", async () => {
+    mockedClassifyIntent.mockResolvedValue("broker_view");
+    mockedRunAgent.mockReturnValue(fakeAgent());
+    const res = await POST(
+      req(
+        {
+          mode: "company",
+          target: "005930",
+          option: "A",
+          threadId: "t1",
+          followup: {
+            text: "목표주가는 얼마야?",
+            currentSpecialistKey: "company_analysis",
+            turns: [{ question: null, answer: "첫 답변" }],
+          },
+        },
+        { "x-forwarded-for": nextIp() },
+      ),
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('"specialistKey":"broker_view"');
+    const history = mockedRunAgent.mock.calls[0][1];
+    expect(history).toEqual([
+      { role: "user", content: expect.stringContaining("005930") },
+      { role: "assistant", content: "첫 답변" },
+      { role: "user", content: "목표주가는 얼마야?" },
+    ]);
+  });
+
+  it("persists the followup turn with the question and chosen specialist", async () => {
+    mockedGetUser.mockResolvedValue({ id: "u1" } as never);
+    mockedClassifyIntent.mockResolvedValue("broker_view");
+    mockedRunAgent.mockReturnValue(fakeAgent());
+    const res = await POST(
+      req(
+        {
+          mode: "company",
+          target: "005930",
+          option: "A",
+          threadId: "t1",
+          followup: {
+            text: "목표주가는 얼마야?",
+            currentSpecialistKey: "company_analysis",
+            turns: [{ question: null, answer: "첫 답변" }],
+          },
+        },
+        { "x-forwarded-for": nextIp() },
+      ),
+    );
+    await res.text();
+    expect(mockedAppendTurn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        turn: expect.objectContaining({ question: "목표주가는 얼마야?", specialistKey: "broker_view", answer: "안녕" }),
+      }),
+    );
+  });
+
+  it("does not persist a followup for a guest", async () => {
+    mockedGetUser.mockResolvedValue(null);
+    mockedClassifyIntent.mockResolvedValue("broker_view");
+    mockedRunAgent.mockReturnValue(fakeAgent());
+    const res = await POST(
+      req(
+        {
+          mode: "company",
+          target: "005930",
+          option: "A",
+          threadId: "t1",
+          followup: { text: "질문", currentSpecialistKey: "company_analysis", turns: [] },
+        },
+        { "x-forwarded-for": nextIp() },
+      ),
+    );
+    await res.text();
+    expect(res.status).toBe(200);
+    expect(mockedAppendTurn).not.toHaveBeenCalled();
+  });
+
+  it("401s on a portfolio followup for a guest", async () => {
+    const res = await POST(
+      req(
+        { mode: "portfolio", threadId: "t1", followup: { text: "질문", currentSpecialistKey: "portfolio", turns: [] } },
+        { "x-forwarded-for": nextIp() },
+      ),
+    );
+    expect(res.status).toBe(401);
+    expect(mockedRunAgent).not.toHaveBeenCalled();
   });
 });

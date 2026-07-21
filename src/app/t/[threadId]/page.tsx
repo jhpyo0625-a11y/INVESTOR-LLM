@@ -29,7 +29,7 @@ export default async function ThreadPage({
       <ChatThread
         threadId={threadId}
         initial={{ mode, target: mode === "portfolio" ? undefined : target, option: mode === "portfolio" ? undefined : option }}
-        initialData={saved ? { steps: saved.steps, answer: saved.answer } : undefined}
+        initialTurns={saved?.turns}
         initialStarred={initialStarred}
       />
     </main>

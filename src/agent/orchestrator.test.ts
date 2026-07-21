@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { route, buildInitialMessage } from "./orchestrator";
+import { route, buildInitialMessage, specialistFamily, resolveSpecialist } from "./orchestrator";
 
 vi.mock("@/lib/listings", () => ({
   findByTicker: (t: string) =>
@@ -50,5 +50,34 @@ describe("orchestrator routing", () => {
   it("portfolio message has no ticker/date, just the instruction", () => {
     const msg = buildInitialMessage({ mode: "portfolio", target: "", option: undefined });
     expect(msg).toContain("포트폴리오");
+  });
+});
+
+describe("specialistFamily", () => {
+  it("returns the two company specialists for mode:company", () => {
+    expect(specialistFamily("company")).toEqual(["company_analysis", "broker_view"]);
+  });
+
+  it("returns the four date specialists for mode:date", () => {
+    expect(specialistFamily("date")).toEqual(["macro", "daily_reports", "disclosures", "flows"]);
+  });
+
+  it("returns just portfolio for mode:portfolio", () => {
+    expect(specialistFamily("portfolio")).toEqual(["portfolio"]);
+  });
+});
+
+describe("resolveSpecialist", () => {
+  it("resolves a static specialist by key", () => {
+    expect(resolveSpecialist("broker_view")?.key).toBe("broker_view");
+  });
+
+  it("resolves the portfolio specialist when userId and supabase are given", () => {
+    const fakeSupabase = {} as never;
+    expect(resolveSpecialist("portfolio", { userId: "u1", supabase: fakeSupabase })?.key).toBe("portfolio");
+  });
+
+  it("returns undefined for portfolio without a userId/supabase", () => {
+    expect(resolveSpecialist("portfolio")).toBeUndefined();
   });
 });

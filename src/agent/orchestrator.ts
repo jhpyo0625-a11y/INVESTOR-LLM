@@ -45,3 +45,19 @@ export function buildInitialMessage(req: AnalysisRequest): string {
   const compact = req.target.replaceAll("-", "");
   return `기준일: ${req.target} (DART 조회용 표기: ${compact}). 오늘 날짜: ${today}. 위 임무에 따라 분석하라.`;
 }
+
+export function specialistFamily(mode: AnalysisRequest["mode"]): readonly SpecialistKey[] {
+  if (mode === "company") return ["company_analysis", "broker_view"];
+  if (mode === "date") return ["macro", "daily_reports", "disclosures", "flows"];
+  return ["portfolio"];
+}
+
+export function resolveSpecialist(
+  key: SpecialistKey,
+  ctx?: { userId?: string; supabase?: SupabaseClient },
+): SpecialistConfig | undefined {
+  if (key === "portfolio") {
+    return ctx?.userId && ctx?.supabase ? buildPortfolioSpecialist(ctx.userId, ctx.supabase) : undefined;
+  }
+  return specialists[key];
+}
